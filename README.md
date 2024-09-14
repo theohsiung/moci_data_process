@@ -1,7 +1,6 @@
 # moci_data_process
 
 ## Rag_knowledge_graph.py
-- [ ] \(Optional) Open a followup issue
 | 模塊  | 日期 |      進度     |
 | ------------- | ------------- | -------------|
 | 聊天記錄模組  | 2024-09-14  |[ ] \(247) 加入對會紀錄存檔機制，使聊天內容具有記憶  |
