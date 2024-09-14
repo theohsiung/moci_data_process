@@ -22,7 +22,8 @@ from langchain_experimental.graph_transformers import LLMGraphTransformer
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.prompts.prompt import PromptTemplate
-from langchain_core.pydantic_v1 import BaseModel, Field
+# from langchain_core.pydantic_v1 import BaseModel, Field
+from pydantic import BaseModel, Field
 from typing import Tuple, List, Optional
 from langchain_community.vectorstores import Neo4jVector
 from langchain_openai import OpenAIEmbeddings
@@ -65,23 +66,43 @@ def structured_retriever(question: str) -> str:
     result = ""
     entities = entity_chain.invoke({"question": question})
     for entity in entities.names:
-        response = graph.query(
+        # 查詢該節點的所有出邊關係和鄰居
+        outgoing_relationships_response = graph.query(
             """
-            CALL db.index.fulltext.queryNodes('entity', $query, {limit: 15})
-            YIELD node, score
-            CALL {
-              WITH node
-              MATCH (node)-[r]->(neighbor)
-              RETURN node.id + ' - ' + type(r) + ' -> ' + neighbor.id AS output
-              UNION ALL
-              MATCH (node)<-[r]-(neighbor)
-              RETURN neighbor.id + ' - ' + type(r) + ' -> ' + node.id AS output
-            }
-            RETURN output LIMIT 15
+            MATCH (n {名稱: $entity})-[r]->(neighbor)
+            RETURN type(r) AS relationship, neighbor
             """,
-            {"query": generate_full_text_query(entity)}
+            {"entity": entity}
         )
-        result += "\n".join([el['output'] for el in response])
+        
+        # 查詢該節點的所有入邊關係和鄰居
+        incoming_relationships_response = graph.query(
+            """
+            MATCH (n {名稱: $entity})<-[r]-(neighbor)
+            RETURN type(r) AS relationship, neighbor
+            """,
+            {"entity": entity}
+        )
+
+        # 將出邊關係和鄰居資訊追加到 result
+        if outgoing_relationships_response:
+            # result += f"\n節點 '{entity}' 的出邊關係:\n"
+            for record in outgoing_relationships_response:
+                relationship = record["relationship"]
+                neighbor = record["neighbor"]
+                result += f"{entity} - 關係:{relationship} -> {neighbor}\n"
+        else:
+            result += f"\n節點 '{entity}' 沒有找到出邊關係\n"
+
+        # 將入邊關係和鄰居資訊追加到 result
+        if incoming_relationships_response:
+            # result += f"\n節點 '{entity}' 的入邊關係:"
+            for record in incoming_relationships_response:
+                relationship = record["relationship"]
+                neighbor = record["neighbor"]
+                result += f"{neighbor} -> 關係:{relationship} - {entity}"
+        else:
+            result += f"\n節點 '{entity}' 沒有找到入邊關係"
 
         # 新增查詢來檢索該節點的所有屬性
         node_properties_response = graph.query(
@@ -95,7 +116,8 @@ def structured_retriever(question: str) -> str:
         # 將節點的屬性資訊追加到 result
         if node_properties_response:
             node_properties = node_properties_response[0]["props"]
-            result += f"\n節點 '{entity}' 的屬性: {node_properties}\n"
+            result += f"\n'{entity}' 的屬性: {node_properties}"
+        print("結果！！！！",result)
     return result
 
 # Extract entities from text
@@ -104,7 +126,7 @@ class Entities(BaseModel):
 
     names: List[str] = Field(
         ...,
-        description="出現在文本中的所有專有名詞、模組、功能、邏輯或按鈕",
+        description="All proper nouns, modules, functions, logic, or buttons that appear in the text.",
     )
 
 NEO4J_URI="neo4j+s://758078e8.databases.neo4j.io"
