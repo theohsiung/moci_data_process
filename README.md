@@ -9,6 +9,6 @@
 | 初始聊天文本處理  | 2024-09-14  |(188) entity 無法有效找出，提問中的關鍵字，導致檢索失效  |❌|
 | neo4j搜索機制  | 2024-09-14  |(65) structured_retriever 無法找出各個節點相連的關係  |✅|
 
-'''mermaid
-flowchart TD
+```mermaid
+    flowchart TD
     A@{ shape: doc, label: "Document" }
